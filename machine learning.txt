@@ -1,0 +1,60 @@
+Describe data
+Outliers
+Normalization (z-score)
+Quantile quantile plot
+Parallel Coordinates Plots
+Cross Plotting Pairs of Attributes
+Correlation heat map
+Violin plot
+
+Performance: 
+MSE (Mean Square Error) 
+RMSE
+MAE (Mean Absolute Error)
+ROC curves (Receiver operating curves)
+AUC (Area Under the Curve)
+
+Training data
+Test data
+Cross-validation
+Sampling should be reprensentation of the whole data set.
+Stratified sampling
+Recombine training and test data sets to retrain the model on the larger data set.
+Overfitting
+Underfitting
+
+Algorithm:
+OLS regression(Ordinary Least Square)
+
+
+Best subset selection: Fix a number of attribute: Na. Then select the best Na attributes that gives the best model. Test all the Na combinations in N and see their scores.
+Forward stepwise regression: Bottom up approch. Take the best attribute, then find attribute that makes the best combination with etc unti Na.
+Least-angle regresssion (LARS)
+Best subset
+Principal Componant regression
+Partial least square
+Glmnet
+
+Penalized linear regression
+Ridge regression
+LASSO
+ElasticNet Penalty
+
+Gradient descent
+
+Statistical hypothesis test
+Null hypothesis
+Alternative hypothesis
+Statistical significance test 
+Type 1 error
+Type 2 error
+Confusion matrice
+
+multiple output case
+
+canonical correlation analysis (CCA)
+Sparse Solutions: many coefficient in the model are zero
+
+Leakage
+
+Categorical input: one-hot encoder
