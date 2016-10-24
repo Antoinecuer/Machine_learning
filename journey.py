@@ -4,9 +4,10 @@ from pandas import Series,DataFrame
 # numpy, matplotlib, seaborn
 import numpy as np
 import matplotlib.pyplot as plt
+"""
 import seaborn as sns
 sns.set_style('whitegrid')
-
+"""
 
 # machine learning
 from sklearn.linear_model import LogisticRegression
@@ -14,19 +15,18 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn import preprocessing
+
 
 titanic_df = pd.read_csv("../input/train.csv", dtype={"Age": np.float64}, )
 test_df    = pd.read_csv("../input/test.csv", dtype={"Age": np.float64}, )
 
 
-titanic_df = titanic_df.drop(['PassengerId'], axis=1)
+#titanic_df = titanic_df.drop(['PassengerId'], axis=1)
 
 
-def normalize(feat):
-    mean = full[feat].mean()
-    stdv = full[feat].std()
-    for df in [titanic_df,test_df]:
-        df[feat + "_norm"] = (df[feat] - mean) / stdv
+		
+
 def changeFeatureDataType(dataframe):
 	sex_dummies= pd.get_dummies(dataframe['Sex'])
 	sex_dummies.drop(['male'], axis=1, inplace=True)
@@ -55,7 +55,7 @@ def changeFeatureDataType(dataframe):
 	Title_dummies.drop(['Mr'], axis=1, inplace=True)
 	dataframe = dataframe.join(Title_dummies)
 	
-	dataframe = dataframe.drop(['Sex','Pclass','CabinSide','Title','Embarked'], axis=1)
+	dataframe = dataframe.drop(['Sex','Pclass','CabinSide','Title','Embarked','Deck'], axis=1)
 	return dataframe
 
 titledict = {"Dr"   : "Mr",
@@ -105,25 +105,37 @@ def familisize(dataframe):
 def removeUnwantedfeatures(dataframe):
     dataframe = dataframe.drop(['Cabin','Ticket'], axis=1)
     return dataframe
-	
+
+firstTime=1
 def transform_dataframe(df):
 	df_transformed = handleMissingValues(df)
-	df_transformed=hadtitle(df_transformed)
-	df_transformed=cabinside(df_transformed)
-	df_transformed=cabindeck(df_transformed)
-	df_transformed=familisize(df_transformed)
+	df_transformed = hadtitle(df_transformed)
+	df_transformed = cabinside(df_transformed)
+	df_transformed = cabindeck(df_transformed)
+	df_transformed = familisize(df_transformed)
 	df_transformed = changeFeatureDataType(df_transformed)
 	df_transformed = removeUnwantedfeatures(df_transformed)
 
 	return df_transformed
 	
+def normalization_dataframe(train_df,test_df):
+	for column in train_df:
+		if(column != "Survived"):
+			if(column != "PassengerId"):
+				test_df[column] = (test_df[column] - train_df[column].mean()) / train_df[column].std()
+				train_df[column] = (train_df[column] - train_df[column].mean()) / train_df[column].std()
+
+	return train_df,test_df
+
 titanic_df=transform_dataframe(titanic_df)
 test_df=transform_dataframe(test_df)
-
-X_train = titanic_df.drop("Survived",axis=1)
+titanic_df,test_df=normalization_dataframe(titanic_df,test_df)
 
 
 from sklearn import linear_model
+
+
+
 """
 corr_mat = np.corrcoef(titanic_df.values.T)
 
@@ -134,52 +146,127 @@ ax = sns.heatmap(corr_mat, annot=True, fmt='.2f',
 _ = (ax.set_title('Correlation Matrix'))
 
 plt.show()
+"""
 
-X_train = titanic_df.drop("Survived",axis=1)
-Y_train = titanic_df["Survived"]
-X_test  = test_df.drop("PassengerId",axis=1).copy()
+X_trainf = titanic_df.drop("Survived",axis=1)
+Y_trainf = titanic_df["Survived"]
+
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.feature_selection import SelectFromModel
+clf = ExtraTreesClassifier(n_estimators=200)
+clf = clf.fit(X_trainf, Y_trainf)
+
+features = pd.DataFrame()
+features['feature'] = X_trainf.columns
+features['importance'] = clf.feature_importances_
+
+model = SelectFromModel(clf, prefit=True)
+X_trainf = model.transform(X_trainf)
+test_df = model.transform(test_df)
+
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+
+#from sklearn.model_selection import cross_val_score
+X_train, X_test, y_train, y_test = train_test_split(X_trainf, Y_trainf, test_size=0.4, random_state=0)
+
+from sklearn.model_selection import cross_val_score
+from sklearn import svm
+
+best_score_SVC=0
+best_param_SVC=[0,0]
+regularisation=[0.01,0.05,0.1,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.60,0.65,0.7,0.75,1,1.5,2,10]
+kern=["linear","poly","rbf","sigmoid"]
+for i in kern:
+	for j in regularisation:
+		clf = svm.SVC(C=j, kernel=i)
+		scores = cross_val_score(clf, X_train, y_train, cv=20)
+		if(scores.mean()>best_score_SVC):
+			best_score_SVC=scores.mean()
+			best_param_SVC=i,j
+		print("SVM mean with kernel:",i,"regularisation:",j, scores.mean())
+		print("------------------------")
+
+print("SVC")
+print(best_param_SVC, best_score_SVC)
+print("--------------------------")
 
 
-logreg = LogisticRegression()
-logreg.fit(X_train, Y_train)
-Y_pred = logreg.predict(X_test)
-print('Logistic regression')
-print(logreg.score(X_train, Y_train))
+penalty=["l1","l2"]
 
-from sklearn.svm import SVC, LinearSVC
-
-svc = SVC()
-svc.fit(X_train, Y_train)
-Y_pred = svc.predict(X_test)
-print('SVC')
-print(svc.score(X_train, Y_train))
-
+best_score_logistic=0
+best_param_logistic=[0,0]
+for i in penalty:
+	for j in regularisation:
+		logreg = LogisticRegression(penalty=i,C=j)
+		scores = cross_val_score(logreg, X_train, y_train, cv=20)
+		if(scores.mean()>best_score_logistic):
+			best_score_logistic=scores.mean()
+			best_param_logistic=i,j
+		#print("Logistic regression mean with penalty:",i,"regularisation:",j, scores.mean())
+		#print("------------------------")
+print("Logistic regression")
+print(best_param_logistic,best_score_logistic)
+print("--------------------------")
 from sklearn.ensemble import RandomForestClassifier
 
-random_forest = RandomForestClassifier(n_estimators=100)
-random_forest.fit(X_train, Y_train)
-Y_pred_RandomForest = random_forest.predict(X_test)
-print('RandomForestClassifier')
-print(random_forest.score(X_train, Y_train))
+estimator=[]
+for i in range(15,25):
+	estimator.append(5*i)
+critere=["gini","entropy"]
+
+best_score_RFC=0
+best_param_RFC=[0,0]
+for i in critere:
+	for j in estimator:
+		random_forest = RandomForestClassifier(n_estimators=j,criterion=i)
+		scores = cross_val_score(random_forest, X_train, y_train, cv=20)
+		if(scores.mean()>best_score_RFC):
+			best_score_RFC=scores.mean()
+			best_param_RFC=i,j
+
+print("RandomForestClassifier")
+print(best_param_RFC,best_score_RFC)
+print("--------------------------")
+
 
 from sklearn.neighbors import KNeighborsClassifier
 
-knn = KNeighborsClassifier(n_neighbors = 3)
-knn.fit(X_train, Y_train)
-Y_pred = knn.predict(X_test)
-print('KNeighborsClassifier')
-print(knn.score(X_train, Y_train))
+n_neighbors=[]
+for i in range(1,10):
+	n_neighbors.append(i)
+
+weights=["uniform","distance"]
+
+best_score_knn=0
+best_param_knn=[0,0]
+for i in weights:
+	for j in n_neighbors:
+		knn = KNeighborsClassifier(n_neighbors = j,weights=i)
+		scores = cross_val_score(knn, X_train, y_train, cv=20)
+		if(scores.mean()>best_score_knn):
+			best_score_knn=scores.mean()
+			best_param_knn=i,j
+
+print("KNeighborsClassifier")
+print(best_param_knn,best_score_knn)
+print("--------------------------")
+
 
 coeff_df = DataFrame(titanic_df.columns.delete(0))
 coeff_df.columns = ['Features']
 coeff_df["Coefficient Estimate"] = pd.Series(logreg.coef_[0])
 print(coeff_df)
 
+"""
+final_SVC = svm.SVC(C=best_param_SVC[1], kernel=best_param_SVC[0])
+final_SVC.fit(X_trainf, Y_trainf)
+Y_pred_SVC = final_SVC.predict(test_df.drop(['PassengerId'], axis=1))
 submission = pd.DataFrame({
         "PassengerId": test_df["PassengerId"],
-        "Survived": Y_pred_RandomForest
+        "Survived": Y_pred_SVC
     })
 submission.to_csv('titanic.csv', index=False)
+
 """
